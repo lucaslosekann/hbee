@@ -1,0 +1,1 @@
+#define REMOTE_LOGS_ENABLED 0
