@@ -8,10 +8,11 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "mqtt_client.h"
+#include "secrets.h"
 #include <string.h>
-#define ESP_WIFI_SSID ""
-#define ESP_WIFI_PASS ""
+
 #define ESP_MAXIMUM_RETRY 3
+#define RETRY_DELAY_MS 5000
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -43,7 +44,9 @@ int pub_mqtt(const char *topic, const char *payload, int qos, int retain) {
 
 void remote_log(const char *payload) {
 #if REMOTE_LOGS_ENABLED
-    pub_mqtt("logs/device1", payload, 1, 0);
+    char topic[50];
+    sprintf(topic, "logs/device%ld", ENId);
+    pub_mqtt(topic, payload, 1, 0);
 #else
     ESP_LOGI(TAG, "[NO_REMOTE] %s", payload);
 #endif
@@ -72,7 +75,7 @@ static void mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
 void connect_mqtt(void) {
     esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = "mqtt://mosquitto.vps.lucaslosekann.dev",
+        .broker.address.uri = MQTT_BROKER_URI,
 
     };
 
@@ -95,6 +98,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_retry_num < ESP_MAXIMUM_RETRY) {
+            vTaskDelay(pdMS_TO_TICKS(RETRY_DELAY_MS));
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "retry to connect to the AP");
@@ -142,10 +146,11 @@ void wifi_init_sta(void) {
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
+    esp_wifi_set_max_tx_power(78); // Set max TX power to 19.5 dBm (78 * 0.25 = 19.5)
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+     * number of re-tries (WIFI_FAIL_BIT) The bits are set by event_handler() (see above) */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
 
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
@@ -161,6 +166,7 @@ void wifi_init_sta(void) {
 
 void setup_logs() {
 #if REMOTE_LOGS_ENABLED
+    // vTaskDelay(pdMS_TO_TICKS(1000));
     wifi_init_sta();
     connect_mqtt();
 #endif

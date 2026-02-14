@@ -34,50 +34,6 @@ void handle_interrupt_tx_task(void *arg) {
     }
 }
 
-void rx_callback(void *ctx, uint8_t *data, uint16_t data_length) {
-    sx127x *device = (sx127x *)ctx;
-    uint8_t payload[2090 * 2];
-    const char SYMBOLS[] = "0123456789ABCDEF";
-    for (size_t i = 0; i < data_length; i++) {
-        uint8_t cur = data[i];
-        payload[2 * i] = SYMBOLS[cur >> 4];
-        payload[2 * i + 1] = SYMBOLS[cur & 0x0F];
-    }
-    payload[data_length * 2] = '\0';
-
-    int32_t frequency_error;
-    ESP_ERROR_CHECK(sx127x_rx_get_frequency_error(device, &frequency_error));
-    int16_t rssi;
-    int code = sx127x_rx_get_packet_rssi(device, &rssi);
-    if (code == SX127X_ERR_NOT_FOUND) {
-        ESP_LOGI(TAG, "received: %d %s freq_error: %" PRId32, data_length, payload, frequency_error);
-    } else {
-        ESP_LOGI(TAG, "received: %d %s rssi: %d freq_error: %" PRId32, data_length, payload, rssi, frequency_error);
-    }
-    total_packets_received++;
-}
-
-void lora_rx_callback(void *ctx, uint8_t *data, uint16_t data_length) {
-    sx127x *device = (sx127x *)ctx;
-    uint8_t payload[514];
-    const char SYMBOLS[] = "0123456789ABCDEF";
-    for (size_t i = 0; i < data_length; i++) {
-        uint8_t cur = data[i];
-        payload[2 * i] = SYMBOLS[cur >> 4];
-        payload[2 * i + 1] = SYMBOLS[cur & 0x0F];
-    }
-    payload[data_length * 2] = '\0';
-
-    int16_t rssi;
-    ESP_ERROR_CHECK(sx127x_rx_get_packet_rssi(device, &rssi));
-    float snr;
-    ESP_ERROR_CHECK(sx127x_lora_rx_get_packet_snr(device, &snr));
-    int32_t frequency_error;
-    ESP_ERROR_CHECK(sx127x_rx_get_frequency_error(device, &frequency_error));
-    ESP_LOGI(TAG, "received: %d %s rssi: %d snr: %f freq_error: %" PRId32, data_length, payload, rssi, snr, frequency_error);
-    total_packets_received++;
-}
-
 void cad_callback(void *ctx, int cad_detected) {
     sx127x *device = (sx127x *)ctx;
     if (cad_detected == 0) {

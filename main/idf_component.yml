@@ -15,3 +15,5 @@ dependencies:
   #   # All dependencies of `main` are public by default.
   #   public: true
   dernasherbrezon/sx127x: ^5.0.1
+  esp-idf-lib/ina260: '*'
+  espressif/led_strip: ^3.0.3
