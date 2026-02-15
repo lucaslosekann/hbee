@@ -25,7 +25,8 @@ void setup_lora_device() {
     ESP_ERROR_CHECK(sx127x_lora_set_spreading_factor(BROADCAST_LORA_SF, &lora_device));
     ESP_ERROR_CHECK(sx127x_lora_set_syncword(18, &lora_device));
     ESP_ERROR_CHECK(sx127x_set_preamble_length(8, &lora_device));
-
+    sx127x_tx_header_t header = {.enable_crc = true, .coding_rate = SX127X_CR_4_5};
+    ESP_ERROR_CHECK(sx127x_lora_tx_set_explicit_header(&header, &lora_device));
     ESP_ERROR_CHECK(setup_task(&lora_device));
 
     gpio_install_isr_service(0);

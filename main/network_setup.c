@@ -37,7 +37,8 @@ void rx_callback(void *ctx, uint8_t *data, uint16_t data_length) {
 
 void allocate_layer() {
 #if BYPASS_GATEWAY
-    ENLayer = 1;
+    ENLayer = ENId;
+    ESP_LOGI(TAG, "Layer set as: %d", ENLayer);
     return;
 #endif
     ESP_LOGI(TAG, "Starting network setup");

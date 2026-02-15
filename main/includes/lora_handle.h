@@ -10,7 +10,7 @@
 #define CH6_LORA_FREQ 869500000
 #define CH7_LORA_FREQ 869700000
 
-extern long channel;
+extern uint64_t channel;
 
 extern sx127x lora_device;
 

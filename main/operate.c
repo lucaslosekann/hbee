@@ -19,7 +19,6 @@ static void rx_callback(void *ctx, uint8_t *data, uint16_t data_length) {
     uint8_t cmdId = data[0];
     if (cmdId != 0x02) {
         ESP_LOGW(TAG, "Received message with unexpected command ID: %d", cmdId);
-        free(data);
         return;
     }
 
@@ -47,12 +46,16 @@ static void rx_callback(void *ctx, uint8_t *data, uint16_t data_length) {
 
         if (parent_idx != -1) {
             parents[parent_idx]->lastVoltage = voltage;
+            parents[parent_idx]->status = ALIVE;
+            parents[parent_idx]->lastHeard = esp_timer_get_time();
         } else if (empty_idx != -1) {
             parents[empty_idx] = malloc(sizeof(parentNode));
             if (parents[empty_idx] != NULL) {
                 parents[empty_idx]->id = sender_id;
                 parents[empty_idx]->layer = layer;
                 parents[empty_idx]->lastVoltage = voltage;
+                parents[empty_idx]->status = ALIVE;
+                parents[empty_idx]->lastHeard = esp_timer_get_time();
             }
         }
     } else {
@@ -106,7 +109,7 @@ void tx_callback(void *ctx) {
     sx127x *device = (sx127x *)ctx;
     packets_sent++;
 
-    ESP_LOGI(TAG, "Transmitted, now listening for response on channel %ld", get_channel_by_id(ENId));
+    ESP_LOGI(TAG, "Transmitted, now listening for response on channel %lld", get_channel_by_id(ENId));
     ESP_ERROR_CHECK(sx127x_set_opmod(SX127X_MODE_RX_CONT, SX127X_MODULATION_LORA, device));
     ESP_ERROR_CHECK(sx127x_set_frequency(get_channel_by_id(ENId), device));
 }
@@ -122,9 +125,12 @@ void send_data(float voltage, uint8_t *data, uint16_t data_length) {
     parentNode *parent = get_parent();
     int parent_id = 0xffff;
     uint64_t channel = BROADCAST_LORA_FREQ;
-    if (parent != NULL) {
+    if (parent != NULL && ENLayer != 1) {
         channel = get_channel_by_id(parent->id);
         parent_id = parent->id;
+    }
+    if (ENLayer == 1) {
+        channel = get_channel_by_id(ENId);
     }
 
     data_to_send[0] = 0x02;                      // Command ID for data transmission
@@ -147,4 +153,33 @@ void send_data(float voltage, uint8_t *data, uint16_t data_length) {
 
     ESP_LOGI(TAG, "Transmitting data to parent 0x%04x on channel %ld", parent_id, channel);
     ESP_ERROR_CHECK(sx127x_set_opmod(SX127X_MODE_TX, SX127X_MODULATION_LORA, &lora_device));
+}
+
+void dump_lora_config() {
+    uint64_t freq;
+    sx127x_get_frequency(&lora_device, &freq);
+    ESP_LOGI(TAG, "Current LoRa frequency: %ld", freq);
+
+    sx127x_sf_t sf;
+    sx127x_lora_get_spreading_factor(&lora_device, &sf);
+    ESP_LOGI(TAG, "Current LoRa spreading factor: SF%d", sf);
+
+    sx127x_mode_t opmod;
+    sx127x_modulation_t modulation;
+    sx127x_get_opmod(&lora_device, &opmod, &modulation);
+    const char *opmod_str = (opmod == SX127X_MODE_SLEEP)       ? "SLEEP"
+                            : (opmod == SX127X_MODE_STANDBY)   ? "STDBY"
+                            : (opmod == SX127X_MODE_FSTX)      ? "FSTX"
+                            : (opmod == SX127X_MODE_TX)        ? "TX"
+                            : (opmod == SX127X_MODE_FSRX)      ? "FSRX"
+                            : (opmod == SX127X_MODE_RX_CONT)   ? "RX_CONT"
+                            : (opmod == SX127X_MODE_RX_SINGLE) ? "RX_SINGLE"
+                                                               : "UNKNOWN";
+    const char *modulation_str = (modulation == SX127X_MODULATION_LORA) ? "LORA" : "UNKNOWN";
+    ESP_LOGI(TAG, "Current LoRa operation mode: %s", opmod_str);
+    ESP_LOGI(TAG, "Current LoRa modulation: %s", modulation_str);
+
+    uint8_t syncword;
+    sx127x_lora_get_syncword(&lora_device, &syncword);
+    ESP_LOGI(TAG, "Current LoRa sync word: 0x%04x", syncword);
 }

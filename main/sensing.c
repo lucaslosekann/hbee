@@ -47,6 +47,6 @@ void sensing_task(void *pvParameters) {
 
         send_data(voltage, (uint8_t *)&current, sizeof(float));
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }
