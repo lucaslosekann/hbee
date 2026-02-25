@@ -29,7 +29,7 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
-    // save_id(); // Save the device ID
+    // save_id(1); // Save the device ID
 
     ENId = read_id();
 
@@ -41,11 +41,13 @@ void app_main(void) {
     set_led_color(255, 255, 255);
 
     setup_lora_device();
+    init_send_data_mutex();
 
-    set_led_color(0, 255, 0);
+    set_led_color(255, 255, 0);
     // STAGES
     // Wait for message from parent so we can know in which layer we are
     allocate_layer();
+    set_led_color(0, 255, 0);
 
     // Forward message with our layer so the other nodes can do the same
     broadcast_initializing_message();

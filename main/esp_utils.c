@@ -34,18 +34,6 @@ void handle_interrupt_tx_task(void *arg) {
     }
 }
 
-void cad_callback(void *ctx, int cad_detected) {
-    sx127x *device = (sx127x *)ctx;
-    if (cad_detected == 0) {
-        ESP_LOGI(TAG, "cad not detected");
-        ESP_ERROR_CHECK(sx127x_set_opmod(SX127X_MODE_CAD, SX127X_MODULATION_LORA, device));
-        return;
-    }
-    // put into RX mode first to handle interrupt as soon as possible
-    ESP_ERROR_CHECK(sx127x_set_opmod(SX127X_MODE_RX_CONT, SX127X_MODULATION_LORA, device));
-    ESP_LOGI(TAG, "cad detected\n");
-}
-
 void setup_gpio_interrupts(gpio_num_t gpio, sx127x *device, gpio_int_type_t type) {
     ESP_ERROR_CHECK(gpio_set_direction(gpio, GPIO_MODE_INPUT));
     ESP_ERROR_CHECK(gpio_pulldown_en(gpio));

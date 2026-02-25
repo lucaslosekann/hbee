@@ -10,6 +10,10 @@
 #define CH6_LORA_FREQ 869500000
 #define CH7_LORA_FREQ 869700000
 
+#define CMD_ID_INIT 0x01
+#define CMD_ID_DATA 0x02
+#define CMD_ID_CHANNEL 0x03
+
 extern uint64_t channel;
 
 extern sx127x lora_device;
@@ -17,3 +21,4 @@ extern sx127x lora_device;
 void setup_lora_device();
 void save_id(int32_t id);
 int32_t read_id();
+bool detect_cad_blocking();

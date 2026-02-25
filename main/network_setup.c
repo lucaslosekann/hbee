@@ -63,7 +63,7 @@ void allocate_layer() {
                 continue;
             }
             uint8_t cmdId = received.data[0];
-            if (cmdId != 0x01) {
+            if (cmdId != CMD_ID_INIT) {
                 ESP_LOGW(TAG, "Received message with unexpected cmdId: %d", cmdId);
                 free(received.data);
                 continue;
@@ -81,8 +81,8 @@ void allocate_layer() {
 
 void broadcast_initializing_message() {
     uint8_t message[2];
-    message[0] = 0x01;    // Command ID
-    message[1] = ENLayer; // Layer
+    message[0] = CMD_ID_INIT; // Command ID
+    message[1] = ENLayer;     // Layer
     ESP_ERROR_CHECK(sx127x_set_opmod(SX127X_MODE_STANDBY, SX127X_MODULATION_LORA, &lora_device));
     ESP_ERROR_CHECK(sx127x_set_frequency(BROADCAST_LORA_FREQ, &lora_device));
     ESP_ERROR_CHECK(sx127x_lora_reset_fifo(&lora_device));

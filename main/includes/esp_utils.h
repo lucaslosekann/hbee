@@ -13,11 +13,11 @@
 #define MISO 1
 #define MOSI 2
 #define SS 4
-#define DIO0 6
+#define DIO0 8
 #define RST 5
 // older versions of TTGO require manual wiring of pins below
-#define DIO1 33
-#define DIO2 32
+#define DIO1 9
+#define DIO2 10
 
 // Heltec lora32 v2
 // #define RST 14

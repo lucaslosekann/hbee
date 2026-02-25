@@ -1,14 +1,19 @@
 
 #include "sensing.h"
 #include "logs.h"
+#include "lora_handle.h"
 #include "operate.h"
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <hbee-node.h>
 #include <ina260.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sx127x.h>
+
+static const char *TAG = "SENSING";
 
 void wait_for_sensor(ina260_t *dev) {
     bool ready, alert, overflow;
@@ -45,7 +50,22 @@ void sensing_task(void *pvParameters) {
         ESP_ERROR_CHECK(ina260_get_current(&dev, &current));
         ESP_ERROR_CHECK(ina260_get_power(&dev, &power));
 
-        send_data(voltage, (uint8_t *)&current, sizeof(float));
+        sx127x_mode_t opmod;
+        sx127x_modulation_t modulation;
+        sx127x_get_opmod(&lora_device, &opmod, &modulation);
+
+        if (opmod != SX127X_MODE_STANDBY && opmod != SX127X_MODE_RX_CONT) {
+            ESP_LOGW(TAG, "LoRa device not in standby or RX mode, skipping transmission");
+            continue;
+        }
+
+        uint8_t data[6];
+        memcpy(data, &current, sizeof(float));
+        data[4] = (ENId >> 8) & 0xFF;
+        data[5] = ENId & 0xFF;
+
+        // ESP_LOGI(TAG, "Voltage: %.2f V, Current: %.2f mA, Power: %.2f mW", voltage, current, power);
+        send_data(voltage, data, sizeof(data));
 
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
