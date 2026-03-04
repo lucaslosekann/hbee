@@ -45,7 +45,7 @@ int pub_mqtt(const char *topic, const char *payload, int qos, int retain) {
 void remote_log(const char *payload) {
 #if REMOTE_LOGS_ENABLED
     char topic[50];
-    sprintf(topic, "logs/device%ld", ENId);
+    sprintf(topic, "logs/device%d", ENId);
     pub_mqtt(topic, payload, 1, 0);
 #else
     ESP_LOGI(TAG, "[NO_REMOTE] %s", payload);
@@ -134,7 +134,8 @@ void wifi_init_sta(void) {
         .sta =
             {
                 .ssid = ESP_WIFI_SSID,
-                .password = ESP_WIFI_PASS,
+
+                // .password = ESP_WIFI_PASS,
                 /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (password len => 8).
                  * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
                  * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to

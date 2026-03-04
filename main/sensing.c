@@ -1,5 +1,6 @@
 
 #include "sensing.h"
+#include "esp_random.h"
 #include "logs.h"
 #include "lora_handle.h"
 #include "operate.h"
@@ -41,6 +42,8 @@ void sensing_task(void *pvParameters) {
     wait_for_sensor(&dev);
 
     float voltage, current, power;
+    ESP_LOGI(TAG, "Waiting %d ms", (6 - (2 * ENLayer - 2)) * 1000);
+    vTaskDelay(pdMS_TO_TICKS((6 - (2 * ENLayer - 2)) * 1000));
     while (1) {
         ESP_ERROR_CHECK(ina260_trigger(&dev));
 
@@ -54,19 +57,16 @@ void sensing_task(void *pvParameters) {
         sx127x_modulation_t modulation;
         sx127x_get_opmod(&lora_device, &opmod, &modulation);
 
-        if (opmod != SX127X_MODE_STANDBY && opmod != SX127X_MODE_RX_CONT) {
-            ESP_LOGW(TAG, "LoRa device not in standby or RX mode, skipping transmission");
-            continue;
-        }
-
-        uint8_t data[6];
+        uint8_t data[7];
         memcpy(data, &current, sizeof(float));
         data[4] = (ENId >> 8) & 0xFF;
         data[5] = ENId & 0xFF;
+        data[6] = ENLayer;
 
         // ESP_LOGI(TAG, "Voltage: %.2f V, Current: %.2f mA, Power: %.2f mW", voltage, current, power);
         send_data(voltage, data, sizeof(data));
 
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        // Delay between 18 and 22
+        vTaskDelay(pdMS_TO_TICKS(20000 + (esp_random() % 2000 - 2000)));
     }
 }

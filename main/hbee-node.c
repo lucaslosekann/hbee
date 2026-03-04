@@ -1,5 +1,6 @@
 #include "hbee-node.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "led.h"
@@ -17,6 +18,7 @@ uint8_t ENLayer = 0xff;
 uint16_t ENId;
 
 void app_main(void) {
+    // esp_random_init();
     config_led();
     // Set color to Red
     set_led_color(255, 0, 0);
@@ -40,8 +42,8 @@ void app_main(void) {
     setup_logs();
     set_led_color(255, 255, 255);
 
-    setup_lora_device();
     init_send_data_mutex();
+    setup_lora_device();
 
     set_led_color(255, 255, 0);
     // STAGES
@@ -49,6 +51,7 @@ void app_main(void) {
     allocate_layer();
     set_led_color(0, 255, 0);
 
+    // vTaskDelay(pdMS_TO_TICKS(500));
     // Forward message with our layer so the other nodes can do the same
     broadcast_initializing_message();
 
@@ -58,5 +61,12 @@ void app_main(void) {
 
     // Initialize sensor reading/transmitting thread
     ESP_ERROR_CHECK(i2cdev_init());
+
+    // Random delay beetween 0 and 20000 ms
+    // #if !BYPASS_GATEWAY
+    //     int random_delay = esp_random() % 20000;
+    //     ESP_LOGI(TAG, "Delaying sensing task start by %d ms to avoid synchronization", random_delay);
+    //     vTaskDelay(pdMS_TO_TICKS(random_delay)); // Add random delay to avoid synchronization of sensing tasks
+    // #endif
     xTaskCreate(sensing_task, "sensing_task", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL);
 }

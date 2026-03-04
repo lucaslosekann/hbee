@@ -20,6 +20,7 @@ void setup_lora_device() {
     sx127x_init_spi(&spi_device);
 
     ESP_ERROR_CHECK(sx127x_create(spi_device, &lora_device));
+    ESP_LOGI(TAG, "Chip version: 0x%02X", lora_device.chip_version);
     ESP_ERROR_CHECK(sx127x_set_opmod(SX127X_MODE_STANDBY, SX127X_MODULATION_LORA, &lora_device));
     ESP_ERROR_CHECK(sx127x_set_frequency(BROADCAST_LORA_FREQ, &lora_device));
     ESP_ERROR_CHECK(sx127x_lora_reset_fifo(&lora_device));
@@ -30,6 +31,7 @@ void setup_lora_device() {
     ESP_ERROR_CHECK(sx127x_lora_set_spreading_factor(BROADCAST_LORA_SF, &lora_device));
     ESP_ERROR_CHECK(sx127x_lora_set_syncword(18, &lora_device));
     ESP_ERROR_CHECK(sx127x_set_preamble_length(8, &lora_device));
+    ESP_ERROR_CHECK(sx127x_tx_set_pa_config(SX127X_PA_PIN_BOOST, 20, &lora_device));
     sx127x_tx_header_t header = {.enable_crc = true, .coding_rate = SX127X_CR_4_5};
     ESP_ERROR_CHECK(sx127x_lora_tx_set_explicit_header(&header, &lora_device));
     ESP_ERROR_CHECK(setup_task(&lora_device));
@@ -40,6 +42,7 @@ void setup_lora_device() {
     setup_gpio_interrupts((gpio_num_t)DIO2, &lora_device, GPIO_INTR_POSEDGE);
 
     start_tx_queue_consumer();
+    start_parent_confirmation_queue_consumer();
 }
 
 void save_id(int32_t id) {
@@ -67,7 +70,6 @@ int32_t read_id() {
 QueueHandle_t cadQueue;
 
 void cad_callback(void *ctx, int cad_detected) {
-    ESP_LOGI("CAD", "Callback fired! detected=%d", cad_detected);
     int result = cad_detected ? 1 : 0;
     xQueueOverwrite(cadQueue, &result);
 }

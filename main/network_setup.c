@@ -20,6 +20,8 @@ typedef struct {
 void rx_callback(void *ctx, uint8_t *data, uint16_t data_length) {
     // sx127x *device = (sx127x *)ctx;
 
+    ESP_LOGI(TAG, "Received message of length %d", data_length);
+
     rxMessage message;
     message.data = malloc(data_length);
     if (message.data == NULL) {
@@ -37,7 +39,15 @@ void rx_callback(void *ctx, uint8_t *data, uint16_t data_length) {
 
 void allocate_layer() {
 #if BYPASS_GATEWAY
-    ENLayer = ENId;
+    if (ENId <= 5) {
+        ENLayer = 1;
+    } else if (ENId <= 7) {
+        ENLayer = 2;
+    } else if (ENId <= 9) {
+        ENLayer = 3;
+    } else {
+        ENLayer = 4;
+    }
     ESP_LOGI(TAG, "Layer set as: %d", ENLayer);
     return;
 #endif
@@ -68,9 +78,31 @@ void allocate_layer() {
                 free(received.data);
                 continue;
             }
+
             uint8_t layer = received.data[1];
 
-            ENLayer = layer + 1; // Set the layer to one more than the received layer, as we are one step further from the gateway
+            // if (ENId == 3 && layer == 0) {
+            //     ESP_LOGI(TAG, "Received initialization message from gateway, but this node is configured to bypass the gateway. Setting layer to 3.");
+            //     free(received.data);
+            //     continue;
+            // }
+            // if (ENId == 5 && (layer == 0 || layer == 1)) {
+            //     ESP_LOGI(TAG, "Received initialization message from gateway, but this node is configured to bypass the gateway. Setting layer to 4.");
+            //     free(received.data);
+            //     continue;
+            // }
+
+            // ENLayer = layer + 1; // Set the layer to one more than the received layer, as we are one step further from the gateway
+
+            if (ENId <= 5) {
+                ENLayer = 1;
+            } else if (ENId <= 7) {
+                ENLayer = 2;
+            } else if (ENId <= 9) {
+                ENLayer = 3;
+            } else {
+                ENLayer = 4;
+            }
             ESP_LOGI(TAG, "Layer set as: %d", ENLayer);
 
             free(received.data);
@@ -87,8 +119,6 @@ void broadcast_initializing_message() {
     ESP_ERROR_CHECK(sx127x_set_frequency(BROADCAST_LORA_FREQ, &lora_device));
     ESP_ERROR_CHECK(sx127x_lora_reset_fifo(&lora_device));
     ESP_ERROR_CHECK(sx127x_lora_set_spreading_factor(BROADCAST_LORA_SF, &lora_device));
-
-    ESP_ERROR_CHECK(sx127x_tx_set_pa_config(SX127X_PA_PIN_BOOST, 20, &lora_device));
 
     ESP_ERROR_CHECK(sx127x_lora_tx_set_for_transmission(message, sizeof(message), &lora_device));
     ESP_LOGI(TAG, "Broadcasting initializing message");
