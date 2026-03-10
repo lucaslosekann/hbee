@@ -4,13 +4,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h> 
+
 
 #include "loragw_aux.h"
 #include "loragw_hal.h"
 
-#define MQTT_HOST "mosquitto.vps.lucaslosekann.dev"
+#define MQTT_HOST "broker.hivemq.com"
 #define MQTT_PORT 1883
-#define MQTT_TOPIC "gateway/rx"
+#define MQTT_TOPIC "HBEE2026gateway/rx"
 
 static volatile bool exit_sig = false;
 static struct mosquitto *mosq = NULL;
@@ -32,7 +34,7 @@ int send_beacon(void) {
 
     txpkt.freq_hz = 868500000; // mesma freq do RF0
     txpkt.rf_chain = 0;        // usar RF0
-    txpkt.rf_power = 20;       // potência em dBm
+    txpkt.rf_power = 2;       // potência em dBm
     txpkt.modulation = MOD_LORA;
     txpkt.bandwidth = BW_125KHZ;
     txpkt.datarate = DR_LORA_SF9;
@@ -40,7 +42,7 @@ int send_beacon(void) {
     txpkt.invert_pol = false;
     txpkt.preamble = 8;
     txpkt.no_crc = false;
-    txpkt.no_header = true;
+    txpkt.no_header = false;
 
     txpkt.size = 2;
     txpkt.payload[0] = payload[0];
@@ -67,7 +69,11 @@ typedef struct {
     uint16_t crc;
 } pkt_id_t;
 
-int main(void) {
+int main(int argc, char *argv[]) {
+    if(argc != 2){
+        printf("Usage: %s <csv_file_path>\n", argv[0]);
+        return -1;
+    }
     /* Signal handling */
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
@@ -115,18 +121,46 @@ int main(void) {
     rfconf.tx_enable = true;
     lgw_rxrf_setconf(0, &rfconf);
 
-    /* 8 canais multi-SF */
-    int32_t if_freq[8] = {-400000, -200000, 0, 200000, -400000, -200000, 0, 200000};
+    /* RF1 */
+    memset(&rfconf, 0, sizeof(rfconf));
+    rfconf.enable = true;
+    rfconf.freq_hz = 869500000;   // Centro 869.5
+    rfconf.type = LGW_RADIO_TYPE_SX1250;
+    rfconf.tx_enable = false;     // Pode deixar false se só vai receber
+    lgw_rxrf_setconf(1, &rfconf);
 
-    struct lgw_conf_rxif_s ifconf;
+    int32_t if_freq_rf0[4] = {
+        -400000,
+        -200000,
+        0,
+        200000
+    };
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 4; i++) {
+        struct lgw_conf_rxif_s ifconf;
         memset(&ifconf, 0, sizeof(ifconf));
         ifconf.enable = true;
         ifconf.rf_chain = 0;
-        ifconf.freq_hz = if_freq[i];
+        ifconf.freq_hz = if_freq_rf0[i];
         ifconf.datarate = DR_LORA_SF9;
         lgw_rxif_setconf(i, &ifconf);
+    }
+
+    int32_t if_freq_rf1[4] = {
+        -400000,
+        -200000,
+        0,
+        200000
+    };
+
+    for (int i = 0; i < 4; i++) {
+        struct lgw_conf_rxif_s ifconf;
+        memset(&ifconf, 0, sizeof(ifconf));
+        ifconf.enable = true;
+        ifconf.rf_chain = 1;
+        ifconf.freq_hz = if_freq_rf1[i];
+        ifconf.datarate = DR_LORA_SF9;
+        lgw_rxif_setconf(i + 4, &ifconf);
     }
 
     if (lgw_start() != LGW_HAL_SUCCESS) {
@@ -134,6 +168,11 @@ int main(void) {
         return -1;
     }
 
+    FILE *csv_file = fopen(argv[1], "a");
+    if (!csv_file) {
+        perror("Failed to open CSV file");
+        return -1;
+    }
     printf("Sending startup beacon...\n");
 
     send_beacon();
@@ -182,10 +221,13 @@ int main(void) {
 
                         memset(hex_payload, 0, sizeof(hex_payload));
                         payload_to_hex(rxpkt[i].payload, rxpkt[i].size, hex_payload);
-                        mosquitto_publish(mosq, NULL, MQTT_TOPIC, strlen(hex_payload), hex_payload, 0, false);
+                        mosquitto_publish(mosq, NULL, MQTT_TOPIC, rxpkt[i].size, rxpkt[i].payload, 0, false);
 
-                        printf("Received pkt on freq: %d, offset: %d, if chain: %d, modem id: %d, count_us: %d\nPublished: %s\n",
-                            rxpkt[i].freq_hz, rxpkt[i].if_chain, rxpkt[i].if_chain, rxpkt[i].modem_id, rxpkt[i].count_us, hex_payload);
+                        fprintf(csv_file, "%lu,%s\n", (unsigned long)time(NULL), hex_payload);
+                        fflush(csv_file); // make sure it's written immediately
+
+                        printf("Received pkt with rssi: %.2f, snr: %.2f, on freq: %d, offset: %d, if chain: %d, modem id: %d, count_us: %d\nPublished: %s\n",
+                            rxpkt[i].rssis, rxpkt[i].snr, rxpkt[i].freq_hz, rxpkt[i].freq_offset, rxpkt[i].if_chain, rxpkt[i].modem_id, rxpkt[i].count_us, hex_payload);
                     }
                 }
             }
@@ -201,5 +243,7 @@ int main(void) {
     mosquitto_destroy(mosq);
     mosquitto_lib_cleanup();
 
+
+    fclose(csv_file);
     return 0;
 }
